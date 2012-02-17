@@ -124,6 +124,12 @@
             root.className = "";
         }
         
+        // The original window size, where the presentation was be created and tested.
+        var originalSize = {
+        width: 1024,
+        height: 768
+        }
+        
         // viewport updates for iPad
         var meta = $("meta[name='viewport']") || document.createElement("meta");
         // hardcoding these values looks pretty bad, as they kind of depend on the content
@@ -181,6 +187,10 @@
             return !!(el && el.id && stepData["impress-" + el.id]);
         }
         
+        var isActive = function ( el ) {
+            return !!(el && el.id && el.classList.contains("active"));
+        }
+        
         steps.forEach(function ( el, idx ) {
             var data = el.dataset,
                 step = {
@@ -221,7 +231,7 @@
         var hashTimeout = null;
         
         var goto = function ( el ) {
-            if ( !isStep(el) || el == active) {
+            if ( !isStep(el) || el == isActive(el)) {
                 // selected element is not defined as step or is already active
                 return false;
             }
@@ -272,6 +282,10 @@
             // check if the transition is zooming in or not
             var zoomin = target.scale >= current.scale;
             
+            // Correct the scale based on the window's size
+            var windowScale = Math.min(window.innerHeight/originalSize.height,
+                window.innerWidth/originalSize.width);
+            
             // if presentation starts (nothing is active yet)
             // don't animate (set duration to 0)
             var duration = (active) ? "1s" : "0";
@@ -280,7 +294,7 @@
                 // to keep the perspective look similar for different scales
                 // we need to 'scale' the perspective, too
                 perspective: step.scale * 1000 + "px",
-                transform: scale(target.scale),
+                transform: scale(target.scale * windowScale),
                 transitionDuration: duration,
                 transitionDelay: (zoomin ? "500ms" : "0ms")
             });
@@ -297,6 +311,7 @@
             return el;
         };
         
+        
         var prev = function () {
             var prev = steps.indexOf( active ) - 1;
             prev = prev >= 0 ? steps[ prev ] : steps[ steps.length-1 ];
@@ -309,6 +324,21 @@
             next = next < steps.length ? steps[ next ] : steps[ 0 ];
             
             return goto(next);
+        };
+        
+        var refresh = function () {
+            active.classList.remove("active");
+            return goto(active);
+        };
+        
+        var first = function () {
+            var firststep = steps[ 0 ];
+            return goto( firststep );
+        };
+        
+        var last = function () {
+            var laststep = steps[ steps.length -1 ];
+            return ( goto(laststep) );
         };
         
         window.addEventListener("hashchange", function () {
@@ -326,7 +356,10 @@
         return (roots[ "impress-root-" + rootId ] = {
             goto: goto,
             next: next,
-            prev: prev
+            prev: prev,
+            refresh: refresh,
+            first: first,
+            last: last,
         });
 
     }
@@ -339,7 +372,7 @@
     
     // keyboard navigation handler
     document.addEventListener("keydown", function ( event ) {
-        if ( event.keyCode == 9 || ( event.keyCode >= 32 && event.keyCode <= 34 ) || (event.keyCode >= 37 && event.keyCode <= 40) ) {
+        if ( event.keyCode == 9 || ( event.keyCode >= 32 && event.keyCode <= 34 ) || (event.keyCode >= 35 && event.keyCode <= 40) ) {
             switch( event.keyCode ) {
                 case 33: ; // pg up
                 case 37: ; // left
@@ -352,6 +385,12 @@
                 case 39: ; // right
                 case 40:   // down
                          impress().next();
+                         break;
+                case 36:   // home
+                         impress().first();
+                         break;
+                case 35:   // end
+                         impress().last();
                          break;
             }
             
@@ -415,6 +454,10 @@
                 event.preventDefault();
             }
         }
+    }, false);
+    window.addEventListener("resize", function () {
+        // Force select on resize
+        impress().refresh();
     }, false);
 })(document, window);
 
